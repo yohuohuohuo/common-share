@@ -1,0 +1,5 @@
+e9aaf441eec771ed4384042ff859fe2120e77fa618265ea141755d81fb60e196  README.md
+1490eb343e48f363b15fb59a2d911dd0f55d6ee3be2642914a1481044088c94e  docs/references/2026-09-21-api-evidence.md
+f0b10ba69c42e326bed22f5a6597f3ac734437b509392f9880843b85467931b6  docs/superpowers/plans/2026-09-21-jev-gmgn-trader-implementation.md
+7a3f8b372772049b607c754f095f7e3a47f93a33e66d4ea1c902f002de85d725  docs/superpowers/specs/2026-09-21-jev-gmgn-trader-design.md
+3f3fd645bd85ac3cfaac324370940ea11246a35ffcf61d18ba082f070a434a0e  document-validation.json
