@@ -1,9 +1,12 @@
 # Jev × GMGN 多链交易实验 V0.1：需求与技术设计
 
 **日期：** 2026-09-21  
-**状态：** 待审阅；产品约束来自已确认对话，工程默认值在本文显式规定。  
+**修订：** R2，纳入已获同意的参考项目评审建议；本次仅更新文档，未实施产品代码。  
+**状态：** 产品边界保持不变；新增工程要求见第15节及配套专项实施清单，运行参数仍需部署前配置。  
 **项目标识：** `jev-gmgn-trader`（可重命名，不绑定现有仓库）。  
 **配套实施计划：** `../plans/2026-09-21-jev-gmgn-trader-implementation.md`  
+**专项实施清单：** [参考项目评审补充](../plans/2026-09-21-reference-review-implementation.md)，与主实施计划共同构成当前有效计划。  
+**参考项目证据：** [固定提交的源码索引](../../references/2026-09-21-reference-project-review.md)。  
 **接口依据：** `../../references/2026-09-21-api-evidence.md`，正文的 [Sxx] 对应该文件。
 
 ## 1. 项目目标及非目标
@@ -44,7 +47,7 @@
 | 决策过程 | 两个串行 Choice：标的＋方向，再选择具体档位；最后最多一笔交易 |
 | 配置初始化 | USD cents 字符串 `["1000","2000","5000","10000"]`；卖出 bps `[2500,5000,7500,10000]` |
 | 普通候选 K 线 | 最近 12 根 5m K 线；最近一根标记是否闭合；不足时不伪造 |
-| 决策历史 | 最近 10 次决策及关联订单结果；不把历史选择写成必需遵循的指令 |
+| 决策历史 | 最近10次全局决策，加每资产过去30天最近3条已知历史摘要；见15.3，不增加上游请求、不自动训练 |
 | 持有人／交易者 | 每类前 20，另拉 renowned 标签；定期轮询，不过滤候选 |
 | 钱包关注度 | 单钱包去重缓存 10 分钟；按轮转次序更新，最多 10 次 stats 请求／分钟 |
 | 单轮数据大小 | 目标请求预算 24k tokens；估算不是精确保证，见第 8 节 |
@@ -149,6 +152,8 @@ sellRaw = floor(availablePositionRaw × sellBps / 10000)
 | `ledger_entries` | 不可变账务事件，唯一 source key；修正用冲销／补充，不静默覆写 |
 | `equity_snapshots` | mark NAV、已知成本范围、外部现金流、估值覆盖和时间 |
 | `audit_events` | 操作者、配置 before/after hash、暂停／恢复／异常处理事件，不含密钥 |
+| `lifecycle_events` | round/intent/order关联、event_key唯一、每聚合递增序号、occurred_at、recorded_at、阶段与结果；与关键状态同事务写入 |
+| `operating_cost_entries` | provider、source_key唯一、计费区间、USD金额nullable、actual/estimated/unknown、off_wallet、计价版本与覆盖；不重复记Gas |
 | `admin_sessions` | 随机 token 的 hash、到期时间、撤销状态；不保存 cookie 明文 |
 
 数量列使用精确 `numeric` 并施加非负整数检查，金额使用精确 decimal；API 对外统一十进制字符串。源 JSON 的数字词法要在转换前保留，不能先经过浮点损失再宣称恢复了精度。
@@ -213,6 +218,8 @@ interface DecisionState {
   universe: UniverseSnapshot[];
   tokens: TokenSnapshot[];
   recentActivity: ActivitySummary[];
+  assetHistory: AssetHistoryContext[]; // 第15.3节的本地、有界、截至快照已知的事实
+  executionSemantics: ExecutionSemantics; // 第15.1节共享执行语义
   coverage: CoverageSummary;
 }
 ```
@@ -225,6 +232,8 @@ interface DecisionState {
 | `UniverseSnapshot` | chain、interval、orderBy、limit、assetIds、applicationFilters（空数组）、providerFilters、providerFilterStatus、observedAtMs |
 | `TokenSnapshot` | assetId、identity、discovery、market、windows、candles、ownership、security、kolParticipation、positionContext、quality |
 | `ActivitySummary` | roundId、decisionTime、step selections、intent status、actual fill or null；不能把失败当 WAIT |
+| `AssetHistoryContext` | accountId、assetId、cutoffAtMs、lookbackDays、entries、coverage；第15.3节 |
+| `ExecutionSemantics` | 固定现货/ExactIn/本金/卖出基准语义、schemaVersion、hash；第15.1节 |
 | `CoverageSummary` | 每模块观测起止、缺失原因、截断、冷却状态、输入压缩记录、完整持仓数量和当前可见数量 |
 
 ### 7.2 钱包参与输入
@@ -255,7 +264,7 @@ Callout 的社会证据字段第一版默认 `not_configured`，因为 Plus 没�
 
 ### 8.2 步骤 B：具体数量
 
-输入包含 A 的选中结果、同一个配置版本、全局账户摘要、选中资产详情及实际报价。Choice 提供最多四档、WAIT、ABSTAIN，仍允许放弃。B 不得选择别的资产；改资产必须下一轮重新开始。
+输入包含 A 的选中结果、同一个配置版本、全局账户摘要、选中资产详情、同一历史截止点的assetHistory及实际报价。Choice 提供最多四档、WAIT、ABSTAIN，仍允许放弃。B 不得选择别的资产；改资产必须下一轮重新开始。
 
 每个 action 绑定 roundId、optionId、chain、accountId、inputAsset、outputAsset、inputAmountRaw、nominalUsdCents 或 sellBps、referencePrice、quote、position/account version、expiresAt。模型只能返回 optionId，不自由生成地址、金额或网络。
 
@@ -396,6 +405,8 @@ DECIDING → WAIT / ABSTAIN / NO_EXECUTABLE_TIER / DECISION_ERROR
 | `/settings` | USD档位、卖出比例、三链配置、采集周期、版本冲突、保存审计 |
 | `/system` | Plus 权重队列、冷却、错误、连接只读检查、暂停／恢复、数据刷新任务 |
 
+第一版采用鉴权后的数据库分页查询和SWR刷新；完整持久化时间线、阶段统计及成本口径按15.4—15.5实现。SSE仅列后续增强，不是第一版交付前提。
+
 第一版不提供绕开 Jev 的任意地址“立即买入”按钮。异常管理和明确暂停属于运维，不是另一套交易策略。
 
 主要内部接口：GET `/api/overview`、`/api/config`、`/api/markets`、`/api/positions`、`/api/decisions`、`/api/orders`、`/api/system`；POST `/api/config`（expectedVersion）、`/api/control/pause`、`/api/control/resume`、`/api/jobs/refresh`、`/api/jobs/probe`、`/api/orders/:id/reconcile`。GET只读数据库，POST后台任务不可包含任意上游URL或私钥。
@@ -435,3 +446,81 @@ Worker重启先读取cooldown和unknown订单，再恢复采集，不重放历�
 每条链都需有一次买入、一次部分卖出、一次清仓、成功订单对账及重启恢复证据，才能宣告该链完整真实交易通过。四档金额与比例的全部组合在模拟传输中覆盖，不需要为了测试在实盘重复买卖全部档位。任何链未完成实盘证据时交付报告明确列为未验收，不称三链全量通过。
 
 **完成标准：** 可部署软件＋管理页面＋全套自动测试＋只读契约证据＋逐链实盘验收状态＋操作手册。没有权限时可交付软件完成状态，但外部验收不得虚构。
+
+
+## 15. R2：参考项目评审的工程增补
+
+本节与前文共同构成有效设计；只细化工程行为，不增加收益策略。参考源码固定在独立证据索引，不能用第三方README代替GMGN/Jev官方契约。原R01—R12保持不变；新增要求编号用于实施追踪：
+
+| 编号 | 第一版要求 | 主任务 |
+|---|---|---|
+| U01 | 提示词、动作、报价和提交参数语义一致 | T01、T11、T12、T14、T20 |
+| U02 | 模型原始选择不可变，失败不得反向交易、降档或规则兜底 | T11—T15、T20 |
+| U03 | 将持仓查询失败、分页遗漏、掉榜与在途故障固化为回归测试 | T06、T09、T14、T15、T19、T20 |
+| U04 | 按代币检索已知历史，保留时间边界、缺失和截断 | T03、T10、T12、T18、T20 |
+| U05 | 持久化决策到成交的事件时间线，分开统计决定、意图、提交和成交 | T03、T13—T18、T20 |
+| U06 | 分阶段耗时与运行成本计量，交易收益和成本调整结果分开 | T03、T06、T11、T13、T16—T18、T20、T21 |
+| D01 | SSE实时通知 | 后续增强；不计入第一版必做任务 |
+
+专项实施清单包含对应接口、测试输入、预期行为与执行顺序；不能把本节仅当建议读物。
+
+### 15.1 共享执行语义与契约测试（U01）
+
+建立唯一`ExecutionSemantics`：schemaVersion=1、marketType=SPOT、orderType=EXACT_IN_SWAP、buyNotionalBasis=INPUT_PRINCIPAL_USD_REFERENCE、sellBasis=SNAPSHOT_AVAILABLE_RAW、allowsShorting=false、separateFees=true。使用规范化JSON生成hash，与prompt hash一起记录；A/B请求都包含该对象。`prompts/decision-v1.md`须明确GMGN现货Swap，不描述为做市、post-only、保证立即成交或做空。
+
+模型看到的B选项、冻结action、报价和最终请求必须共享chain/account/inputAsset/outputAsset/inputAmountRaw/configVersion；冻结action保留selectedQuoteId、最低输出与授权滑点。执行前读取更新数据是核验，不允许修改数量、反转方向或放宽授权。一次刷新报价若改变模型见到的最低输出或其他执行条件，必须重新提供给B并形成新的不可变调用记录；不允许沿用旧选择暗中替换报价。受本轮总deadline约束，不能无限重问，任何时刻最终最多一笔Swap。
+
+测试应同时检查实际模型请求、解码后的提交请求和冻结记录，不只匹配提示词中的关键词。字段不一致记`EXECUTION_CONTRACT_MISMATCH`，提交次数为0。变更提示词时审阅执行描述并更新hash；自动测试不能证明所有自然语言语义，只保证已定义的契约字段及固定表述不漂移。
+
+### 15.2 原始模型决定与执行结果分离（U02）
+
+`model_calls`记录的selected、probabilities、confidence、actualModel、request/response和hash不可变。执行器只追加结果和原因，不回写模型动作。BUY无法执行记BLOCKED/EXPIRED等，不能改SELL、较小金额、另一链或排名第二标的。
+
+WAIT和ABSTAIN是合法决定；网络、解析、超时和非法option是DECISION_ERROR，不伪装成模型选择。Jev失败不启动mock/规则策略继续实盘；fake模型仅供阻断真实网络的自动化测试，不是对照组。底层请求可能重试的次数与结果分别保留，任何重试都不能扩大一轮一个意图的约束。
+
+### 15.3 有界的按代币历史上下文（U04）
+
+全局最近10轮之外，第一层为每个可见asset提供过去30天、最多3条摘要；第二层展开选中asset的同一批事件。按`accountId + chain-qualified assetId`隔离，以`occurredAt <= cutoffAt`且`recordedAt <= cutoffAt`的不可变事件查询，稳定排序为occurredAt DESC、recordedAt DESC、eventId DESC。所有A/B/分组调用共享cutoff，晚到成交和后来修改的当前订单状态不得泄漏进旧快照。
+
+每条摘要保留eventId、roundId、事实类别、操作、时间、当时已知的状态、数量/费用nullable、sourceKey、quality；失败、未执行及真实成交分别表达。仅在有同asset、同raw输入和可比较净输出口径时计算quote-to-fill偏差，缺证据则null，不拿最新价估算历史实际成本。
+
+数据来自已有PostgreSQL记录；不新增GMGN画像或历史API调用，不引入向量库/LLM总结。重复事件在全局及asset上下文中通过eventId引用，不被统计为两次。资产无记录返回空entries和完整覆盖描述，不等于历史表现为零。
+
+数据库以repeatable-read快照/不可变事实版本保证重放。增加`(account_id,asset_id,recorded_at,event_id)`查询索引；不能从后来回写的orders/fills字段直接构造过去已知状态。打包依次将每asset历史3→1→0，输出coverage和省略数量；不因此删除候选或持仓。30天/3条纳入版本化数据库配置，初值只是输入预算，不是交易条件。
+
+历史不会自动生成禁买、冷却、止损、信号权重或收益评分；只是Jev可引用的事实。
+
+### 15.4 持久化时间线与统计口径（U05）
+
+增加`lifecycle_events`，以稳定event_key去重；round/intent/order关联可空但至少关联一个，per-aggregate序号事务分配。关键状态转移与事件在同一事务提交；若已发送后DB失败，按原unknown恢复，不为了补齐时间线重发。每条记录包含occurred_at与recorded_at，晚到确认允许追加，不覆盖原始submitted事件。
+
+页面重建顺序：快照→A→报价→B→意图→执行检查→提交/未知→订单确认→账本。事件与账本不是同一概念，页面通知不代替fill。GET分页使用稳定sequence游标；刷新不插入新事件、不调用GMGN、不重复统计。
+
+按相同时间范围和运行模式分开统计：已完成有效决策的轮数（WAIT/ABSTAIN包括在内，错误不包括）、trade_intents唯一数、submitAttempts实际发送尝试数、submitted有服务接收证据的订单数、confirmedOrders有确认及实际报告的订单数、fills真实成交事件数。unknown发送只增加尝试，不自动算服务已接受；A/B/分组多次调用不能把一轮算多轮。
+
+只有authenticated的UI能读敏感交易事件。D01若未来实现，采用先落库后通知、事件ID/游标补拉、断线后重建及幂等消费；不复制开放CORS的展示服务器。第一版通过DB+SWR提供完整时间线即可。
+
+### 15.5 阶段耗时、请求计量与成本口径（U06）
+
+为每个阶段记录roundId、step、attempt、provider、queueWaitMs、requestMs、outcome，以及A/B实际耗时、数据age、报价发送时age、提交到确认时间。单进程持续时间用单调时钟；跨进程以UTC事件时间及来源标记计算，时钟异常标unknown，不能把两个进程的performance.now相减。并行耗时与关键路径耗时分别展示，不能简单求和；未发生阶段为null，不是0。
+
+Jev和GMGN各有独立调度/冷却状态：GMGN仍按Plus16/20和背景10执行；Jev保留deadline和可配置重试预算，429读取有效Retry-After，缺失时采用5—60秒有界退避并记录。529/5xx是可用性错误，不伪造GMGN配额状态；冷却不通过换供应商或规则模型交易。已提交订单查询不因Jev错误而停止。参考项目中的两秒节奏不是本项目或官方限额。
+
+`model_calls`保存实际usage与版本化价格快照。成本标actual/estimated/unknown；请求失败且usage未知不可直接按0计费。价格缺失时保留usage与金额null。每次调用尝试均计量；是否收费以证据为准，不仅统计成功BUY的调用。
+
+增加`operating_cost_entries`，记录source_key、provider、billingPeriodStart/End、amountUsd nullable、quality、offWallet、pricingVersion、allocationMethod和证据。GMGN Plus的美元套餐费只依据实际账单或管理员明确填写；权重不是美元、不能按每weight虚构单价。期间成本按显式分摊策略归属，默认只展示完整计费区间，不静默把整月费扣进一天。实际账单替代估算采用关联冲销/结算，不把二者同时累加。
+
+同时展示三种结果：交易账本PNL（按原成本法与Gas口径）、扣净外部现金流后的钱包NAV变化、在相同期间再扣off-wallet运行成本的实验结果。链上Gas及已包含的交易费不再作为off-wallet成本扣第二次；钱包内已经反映的运行支出也不重复扣。覆盖不全时展示已知成本小计与缺失项，完整调整结果为null/partial，不能命名为已确认净利润。不计算或展示未经验证的预期收益。
+
+### 15.6 新增必须通过的回归场景（U01—U06）
+
+- 提示词/动作说ExactIn但提交改成百分比或其他模式：拒绝提交；报价更新不得暗中改变最低输出。
+- 模型BUY但余额不足：原始selected/probabilities不变、POST=0、无SELL/降档/规则fallback。
+- 某页持仓超时、重复cursor、返回空但不完整：不删除原持仓；managed掉榜或无KOL资料仍参与管理。
+- 服务已接受但响应丢失、DB写失败/重启、重复poll：原单继续核对、POST<=1、fill/事件/费用各幂等。
+- Jev超时/429/无效choice：DECISION_ERROR、无交易，已提交订单继续查询；GMGN冷却期间真实网络调用数不增加。
+- 历史来自另一链/账户、recordedAt晚于cutoff、后来确认：不能进入旧轮；历史亏损本身不阻止合法BUY。
+- 一轮两次或多次模型调用、重复前端刷新和多fill：轮/意图/尝试/订单/成交分别统计，不混同。
+- 交易费用已入账、模型成本未知、账单跨期、估算被实账替代：不重复扣、不把未知填0、不伪称完整净收益。
+
+测试是可回放的工程验收，不是收益对照组。U01—U06为第一版必须；D01明确不阻塞交付。

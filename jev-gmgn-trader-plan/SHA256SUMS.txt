@@ -1,5 +1,7 @@
-e9aaf441eec771ed4384042ff859fe2120e77fa618265ea141755d81fb60e196  README.md
+1d28627f917467c4063a739d6caa9f7598739aba8da73cfff05ae19e768214c9  README.md
 1490eb343e48f363b15fb59a2d911dd0f55d6ee3be2642914a1481044088c94e  docs/references/2026-09-21-api-evidence.md
-f0b10ba69c42e326bed22f5a6597f3ac734437b509392f9880843b85467931b6  docs/superpowers/plans/2026-09-21-jev-gmgn-trader-implementation.md
-7a3f8b372772049b607c754f095f7e3a47f93a33e66d4ea1c902f002de85d725  docs/superpowers/specs/2026-09-21-jev-gmgn-trader-design.md
-3f3fd645bd85ac3cfaac324370940ea11246a35ffcf61d18ba082f070a434a0e  document-validation.json
+fdb731386bd54aa48df8decb7b0b1670b4c9c3e688519172c651649f44a9b2e6  docs/references/2026-09-21-reference-project-review.md
+8797674100631f0fff94901b7142a7230fe2b1605f320973a0ac50364882eb23  docs/superpowers/plans/2026-09-21-jev-gmgn-trader-implementation.md
+10255638d4ad8522eb7888ba5ed72e6791301a076816b804ab890fad8a909fc2  docs/superpowers/plans/2026-09-21-reference-review-implementation.md
+75cc0179bacd10ef7971fb58d155677387a036fdbac37b82687d7721e7c2105e  docs/superpowers/specs/2026-09-21-jev-gmgn-trader-design.md
+b251372a7facfd36b6a13ae7ebc5b6b5b7c7477b94c986e2aadf14674c4734e3  document-validation.json

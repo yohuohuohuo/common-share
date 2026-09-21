@@ -12,7 +12,11 @@
 
 **Evidence:** `docs/references/2026-09-21-api-evidence.md`。文中的 Sxx 均引用该记录。
 
-**Status:** 计划待审阅；所有实施步骤未执行。本计划既不是测试报告，也不授权调用真实 Swap。当前未连接用户的新仓库。
+**Status:** R2文档修订；按用户同意纳入参考项目评审，所有产品实施步骤仍未执行。本计划既不是测试报告，也不授权调用真实Swap。计划存放于common-share，产品仍在独立新项目实施。
+
+**Mandatory supplement:** [参考项目评审专项实施清单](2026-09-21-reference-review-implementation.md)。U01—U06是T01—T22的必做扩展，不是可选建议；按该清单的任务映射同步完成。D01/SSE仅列后续增强。
+
+**Reference evidence:** [固定提交源码及采用边界](../../references/2026-09-21-reference-project-review.md)。
 
 ## Global Constraints
 
@@ -20,12 +24,12 @@
 - GMGN 官方 API，按 Plus `rate=20, capacity=20` 的权重限制设计；本地总预算16 weight/s、背景预算10 weight/s、突发容量20。
 - 一轮全局最多一个最终 Swap；允许 WAIT／ABSTAIN，两个模型步骤不等于两笔交易。
 - `buyAmountTiersUsdCents=["1000","2000","5000","10000"]`；`sellBpsTiers=[2500,5000,7500,10000]`，数据库是唯一业务配置来源。
-- 同一轮使用同一配置版本；金额与比例都冻结为原始输入数量；不擅自降档。
+- 同一轮使用同一配置版本；金额与比例都冻结为原始输入数量；不擅自降档。共享ExecutionSemantics贯穿提示词、报价、动作与提交，语义不一致拒单。
 - 默认 `TRADING_ENABLED=false`，管理页面不能越权启用；调用侧必须再次检查，不只在UI隐藏按钮。
 - 不添加选币指标阈值、置信度门槛、固定止盈止损、自动跟单、对照组或其他LLM。
 - 量价时间字段精确归一化；未知≠0；数据单位冲突不得猜；上游标签不当作真理。
 - 不把wallet追踪／备注数当X粉丝数，不把转入当买入，不把多个wallet计成独立人数。
-- 所有managed持仓持续监控，不因掉榜或上游分页而消失。
+- 所有managed持仓持续监控，不因掉榜或上游分页而消失；按代币历史仅取同账户/资产且在本轮cutoff前已知的不可变事实。
 - 提交≠成交；未知结果不自动重发；鉴权client_id不是已确认的订单幂等键。
 - 用户文档和页面中文，代码注释可英文；新建独立项目，不覆盖现有Robinhood仓库。
 - 不新增Redis、微服务、桥接、公开注册或任意交易控制台；所有测试默认阻断真实供应商写入。
@@ -40,7 +44,7 @@
 
 ## 0. 实施方式和统一约定
 
-按 T01→T22 顺序推进；表中的依赖通过后才能开始对应任务。每个任务先写失败测试，记录失败原因，再做最小实现，运行测试并独立提交。纯文档更新也通过链接／配置检查，不用“看起来正确”代替证据。下文代码为计划中的目标测试和算法契约，不代表本轮已经创建或运行产品代码。
+按 T01→T22 顺序推进；表中的依赖通过后才能开始对应任务。每个任务先写失败测试，记录失败原因，再做最小实现，运行测试并独立提交。纯文档更新也通过链接／配置检查，不用“看起来正确”代替证据。完成每项任务前，同时核对专项清单中归属该任务的U项；T20汇总U01—U06全部回归。下文代码为计划中的目标测试和算法契约，不代表本轮已经创建或运行产品代码。
 
 单元测试统一在仓库根执行：`pnpm exec vitest run <文件>`。数据库测试使用 `DATABASE_URL_TEST` 指向独立测试库，不接受生产数据库。UI测试执行 `pnpm exec playwright test <文件>`。一切fixture标记为synthetic，不能充当真实API回包。
 
@@ -113,6 +117,8 @@ export interface AssetRef {
 
 ## T01：项目骨架、类型契约和官方API基线
 
+**R2必做扩展：** 定义共享ExecutionSemantics及规范化hash；登记参考源码固定提交和许可；采用边界见专项U01，不能复制其他项目的执行假设。
+
 **依赖：** 无。**覆盖：** R01–R03、Review Focus 1。
 
 **文件：** 新建根`package.json`、`pnpm-workspace.yaml`、`tsconfig.base.json`、`vitest.config.ts`、`tests/setup-network.ts`；创建五个workspace的package与index；创建`packages/domain/src/contracts.ts`、`contracts/gmgn/routes.json`、`scripts/validate-api-register.ts`、`scripts/validate-api-register.test.ts`、`docs/references/upstream-lock.json`。
@@ -170,6 +176,8 @@ test('USD notional converts using payment-asset price', () => {
 **验收：** 10/20/50/100美元只由支付资产价格换算；未执行任何网络请求。
 
 ## T03：数据库schema、迁移与唯一约束
+
+**R2必做扩展：** 同批迁移新增lifecycle_events、operating_cost_entries及按资产历史索引；加入事件幂等与成本source_key约束，字段定义见专项U04—U06。
 
 **依赖：** T01、T02。**覆盖：** R09、R12。
 
@@ -267,6 +275,8 @@ test('repeated array values are encoded and sorted', () => {
 
 ## T06：Plus全局权重调度与冷却
 
+**R2必做扩展：** 增加GMGN/Jev独立冷却回归和阶段排队计量，冷却期间network call count不变；见专项U03/U06。
+
 **依赖：** T03、T05。**覆盖：** R02，Review Focus 4。
 
 **文件：** `apps/worker/src/scheduler/{weighted-budget,priority-queue,cooldown}.ts`、`packages/db/src/provider-state-repository.ts`及测试。
@@ -362,6 +372,8 @@ test('GMGN attention is distinct from X followers', () => {
 
 ## T09：真实账户同步、完整持仓与就绪检查
 
+**R2必做扩展：** 执行专项U03的timeout、第二页失败、重复cursor及掉榜/无KOL参数化回归；不能以缺失数据清零或跳过managed持仓。
+
 **依赖：** T03、T05、T06、T07。**覆盖：** R03、R04、R12，Review Focus 5。
 
 **文件：** `apps/worker/src/collectors/accounts.ts`；`packages/providers/src/gmgn/portfolio.ts`；`packages/db/src/{accounts,positions}-repository.ts`；`packages/domain/src/universe.ts`及测试。
@@ -389,6 +401,8 @@ test('all managed holdings survive removal from trending', () => {
 
 ## T10：可回放快照、摘要压缩和覆盖字段
 
+**R2必做扩展：** 实现专项U04的本地按资产历史查询、cutoff防未来泄漏和3→1→0压缩；不新增GMGN请求。DecisionState加入assetHistory及executionSemantics。assetHistoryLimit=0表示关闭历史查询，由上层直接返回空entries及coverage，不向要求正limit的选择函数传0。
+
 **依赖：** T04、T07、T08、T09。**覆盖：** R08、R09。
 
 **文件：** `apps/worker/src/decision/{snapshot,packing}.ts`；`packages/domain/src/decision-state.ts`；`packages/db/src/rounds-repository.ts`及测试。
@@ -397,7 +411,7 @@ test('all managed holdings survive removal from trending', () => {
 
 - [ ] 写快照不可变、保留缺失和钱包去重引用测试。InputBudget含maxEstimatedTokens、estimatorVersion、maxAssetsPerGroup；PackedState含state、estimatedTokens、estimationMethod、compressionLog、groupsNeeded。
 - [ ] 运行`pnpm exec vitest run apps/worker/src/decision/snapshot.test.ts apps/worker/src/decision/packing.test.ts`确认FAIL。
-- [ ] 实现配置和账户一致性快照，所有量价带时间来源；input includes all managed positions。共享wallet dictionary只存一份画像，token记录ref；历史最多10轮，K线最多12根。保留unit dictionary、missing理由和估算token方法。
+- [ ] 实现配置和账户一致性快照，所有量价带时间来源；input includes all managed positions。共享wallet dictionary只存一份画像，token记录ref；全局历史最多10轮，另加专项U04按资产30天/3条摘要及覆盖；K线最多12根。保留unit dictionary、missing理由和估算token方法。
 - [ ] 具体压缩顺序写成数据算法，不按收益筛选：
 
 ```text
@@ -413,6 +427,8 @@ test('all managed holdings survive removal from trending', () => {
 **验收：** 每个模型结果能追溯其实际输入，不仅能看到“用了哪些接口”。
 
 ## T11：Jev Choice客户端、结果验证和容量复选
+
+**R2必做扩展：** 执行专项U01/U02：模型请求携带共享语义，原始选择不可变，失败为DECISION_ERROR而非WAIT/规则fallback；记录各次调用usage及成本质量。
 
 **依赖：** T01、T10。**覆盖：** R05、R11。
 
@@ -441,6 +457,8 @@ test('model cannot invent executable options', () => {
 **验收：** Jev输入输出完全结构化；无自由地址执行，无confidence交易门槛。
 
 ## T12：四档报价、第二步金额选择和动作冻结
+
+**R2必做扩展：** 执行专项U01：四档展示/冻结/提交一致；报价刷新改变条件必须重新经B确认，受本轮deadline约束；B历史沿用A的cutoff。
 
 **依赖：** T02、T06、T09、T11。**覆盖：** R05–R07，Review Focus 2。
 
@@ -471,6 +489,8 @@ test('sell fractions bind current available raw amount', () => {
 
 ## T13：决策轮编排与唯一交易意图
 
+**R2必做扩展：** 按专项U05写持久化生命周期事件；两步/分组调用不多计决策轮；按U06记录阶段耗时，不把并行耗时相加冒充端到端。
+
 **依赖：** T10–T12、T03、T04。**覆盖：** R05、R09、R12。
 
 **文件：** `apps/worker/src/decision/run-round.ts`；`packages/db/src/intents-repository.ts`；`tests/integration/decision-round.test.ts`。
@@ -497,9 +517,11 @@ read config + runtime → create round & snapshot
 - [ ] 记录A/B latency、token usage、quote weight、过期和阶段失败；分组调用保存完整路径。一次轮最多创建一个intent，即便部分步骤自动重试也不重复。
 - [ ] 通过并发与错误测试后提交`feat: orchestrate globally serialized decision rounds`。
 
-**验收：** 可以完整运行到已持久化交易意图，尚不要求真实发送。
+**验收：** 可以完整运行到已持久化交易意图，尚不要求真实发送；同一事务的生命周期记录可从数据库重建。
 
 ## T14：实盘闸门、持久化提交与资金预留
+
+**R2必做扩展：** 执行专项U01/U02/U03的请求解码比较、BUY不得改SELL/降档及提交后DB失败测试；执行器不得回写model_calls。
 
 **依赖：** T03、T04、T05、T06、T13。**覆盖：** R10–R12，Review Focus 2/3。
 
@@ -530,6 +552,8 @@ test('live submit is fail-closed', () => {
 
 ## T15：订单状态映射、未知提交和重启对账
 
+**R2必做扩展：** 恢复与poll遵循专项U03/U05：unknown不可重复POST，事件幂等，确认追加不覆盖原提交时间；Jev故障不停止已有订单核对。
+
 **依赖：** T14、T09。**覆盖：** R12，Review Focus 1/3。
 
 **文件：** `packages/providers/src/gmgn/order-status.ts`；`apps/worker/src/execution/{poll,reconcile}.ts`；`tests/integration/order-recovery.test.ts`。
@@ -559,6 +583,8 @@ test('unrecognized status never becomes a fill', () => {
 
 ## T16：成交落账、成本、费用和账户净值
 
+**R2必做扩展：** 实现专项U06三种结果口径与成本覆盖；未知成本保留null，模型实际usage计费估算和GMGN实际账单分别管理，不按weight造美元价格。
+
 **依赖：** T03、T09、T15。**覆盖：** R12，Review Focus 5。
 
 **文件：** `packages/domain/src/{cost-basis,equity}.ts`；`packages/db/src/ledger-repository.ts`；`apps/worker/src/execution/settle.ts`；`tests/integration/ledger.test.ts`。
@@ -586,6 +612,8 @@ test('partial exit releases proportional remaining cost', () => {
 
 ## T17：管理员鉴权与内部API
 
+**R2必做扩展：** 增加鉴权的生命周期分页查询、阶段统计和运行成本查询/人工账单登记API，见专项U05/U06；GET不调用上游，录入有审计。
+
 **依赖：** T03、T04、T09、T13、T15、T16。**覆盖：** R01、R09、R10。
 
 **文件：** `apps/web/src/server/{auth,csrf,queries}.ts`；`apps/web/src/app/api/`对应设计第12节路由；`packages/db/src/sessions-repository.ts`；`scripts/hash-admin-password.ts`；`tests/integration/admin-api.test.ts`。
@@ -602,6 +630,8 @@ test('partial exit releases proportional remaining cost', () => {
 **验收：** 管理页面能控制配置和暂停，但不能越过env或直接构造任意交易。
 
 ## T18：完整管理页面
+
+**R2必做扩展：** 完成专项U04—U06历史来源、不可变模型动作/执行结果并列、事件时间线、耗时和成本页面测试；第一版DB+SWR，SSE非必做。
 
 **依赖：** T17。**覆盖：** R01、R08–R10、R12。
 
@@ -632,6 +662,8 @@ test('settings show USD tiers without enabling live trading', async ({ page }) =
 
 ## T19：Worker生命周期、任务恢复和统一调度接线
 
+**R2必做扩展：** 重启恢复同时恢复独立供应商冷却、事件顺序和未决订单；执行专项U03的无重复发送与U05的可重建时间线测试。
+
 **依赖：** T06–T18。**覆盖：** R01、R02、R12，Review Focus 3/4。
 
 **文件：** `apps/worker/src/{main,bootstrap,health}.ts`、`scheduler/dispatch.ts`；`packages/db/src/{jobs,worker}-repository.ts`；`tests/integration/worker-lifecycle.test.ts`。
@@ -648,6 +680,8 @@ test('settings show USD tiers without enabling live trading', async ({ page }) =
 **验收：** 关闭浏览器交易循环仍运行；热重启不会多开循环或重复下单。
 
 ## T20：综合故障测试、Plus负载回放与需求追踪
+
+**R2必做扩展：** 将专项U01—U06的全部测试纳入门禁及requirement/task/test/result矩阵；D01标DEFERRED，不伪称已实现。
 
 **依赖：** T19。**覆盖：** R01–R12，所有Review Focus。
 
@@ -677,6 +711,8 @@ pnpm build
 
 ## T21：部署、操作手册和安全交接
 
+**R2必做扩展：** 运维手册补运行成本口径、报价/提示词同步变更和历史cutoff说明；库备份包括新事件/成本表，模型测试替身不会在实盘fallback。
+
 **依赖：** T20。**覆盖：** R01、R10、R12。
 
 **文件：** `Dockerfile.web`、`Dockerfile.worker`、`compose.yml`、`.env.example`、`.gitignore`；`docs/operations/{deployment,configuration,incident-response,backup-restore}.md`；`scripts/check-deployment.ts`及测试。
@@ -693,6 +729,8 @@ pnpm build
 **验收：** 有凭证的所有者能按手册部署，不必自己补交易引擎和页面；没有凭证时明确哪些功能未就绪。
 
 ## T22：真实账号只读验收、实盘验收入口与交付报告
+
+**R2必做扩展：** 交付报告区分文档检查、自动测试、账号只读与实盘证据；补U01—U06结果，不把参考项目测试或收益当本项目验收。
 
 **依赖：** T21。**覆盖：** R01–R12的外部验证。
 
@@ -752,3 +790,20 @@ M1～M4分别可测试，但不把中间里程碑当作完整第一版交付。�
 发布计划包前检查：需求R01–R12覆盖、初始金额和比例一致、所有源引用存在、两步决策仍然一笔交易、Plus权重算术、配置版本与pause语义、公开API冲突未被隐去、链接可定位、代码块闭合、计划未声称代码测试或实盘已通过。
 
 本轮文档自查不是代码评审，也不能代替T20～T22的执行证据。计划确认之后才进入代码实施；不要因文档内出现命令就自动运行真实交易。
+
+
+## 5. R2专项要求覆盖与完成条件
+
+| 增补编号 | 内容 | 归属任务 |
+|---|---|---|
+| U01 | 提示词/报价/动作/提交语义一致 | T01、T11、T12、T14、T20 |
+| U02 | 模型动作不可变、无反向/降档/规则fallback | T11—T15、T20 |
+| U03 | 持仓与在途故障回归、独立冷却 | T06、T09、T14、T15、T19、T20 |
+| U04 | 有界assetHistory、同轮cutoff、无未来泄漏 | T03、T10、T12、T18、T20 |
+| U05 | 持久化时间线、阶段统计及幂等 | T03、T13—T18、T20 |
+| U06 | 阶段耗时、模型/API运行成本与收益口径 | T03、T06、T11、T13、T16—T18、T20、T21 |
+| D01 | SSE | DEFERRED；不计第一版验收 |
+
+原22项任务编号不变；专项清单的U项按本表并入相应任务，不是T22之后才做。未完成某个必做U项时，对应主任务不可标完成。测试命令和核心示例见`2026-09-21-reference-review-implementation.md`；最终交付报告同时包含R01—R12与U01—U06。
+
+本次只核对文档引用、任务映射、原始需求和新增约束一致性；不声称计划里的任何产品测试已经运行。
