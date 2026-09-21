@@ -1,40 +1,42 @@
-# Jev × GMGN 多链交易实验：计划包 V0.1 / 文档修订 R2
+# Jev × GMGN 多链交易实验：V0.1 / 执行计划 R3
 
-日期：2026-09-21。状态：**已纳入用户同意的参考项目评审增补；仅为设计与实施计划，未实施交易软件。**
+日期：2026-09-21。**当前仅有计划文档，产品代码未实施。**
 
-## 阅读顺序
+## 开始阅读
 
-1. `docs/superpowers/specs/2026-09-21-jev-gmgn-trader-design.md`：已确认需求、架构、状态／动作协议、数据库、Plus 调度、安全边界与验收定义。
-2. `docs/superpowers/plans/2026-09-21-jev-gmgn-trader-implementation.md`：按依赖排序的实施任务，逐项列出文件、接口、测试、操作与验收。
-3. `docs/references/2026-09-21-api-evidence.md`：官方来源、请求权重、文档冲突和账号接入验证清单。
+从[八阶段执行总览](docs/superpowers/plans/00-execution-index.md)进入。每次Agent会话只读[执行规则](docs/superpowers/plans/execution-rules.md)、当前阶段计划和前一阶段交接；设计只查本阶段相关章节，不再全量读取旧主/专项计划。
 
-4. [参考项目评审专项实施清单](docs/superpowers/plans/2026-09-21-reference-review-implementation.md)：U01—U06并入原22项任务，必读、必做；不是T22后的可选建议。
-5. [固定参考源码和采用边界](docs/references/2026-09-21-reference-project-review.md)：jev-trader与Prism的固定提交、采用范围、不采用的策略。
+- [P01 项目基础与配置](docs/superpowers/plans/01-foundation-and-config.md)
+- [P02 供应商接入与运行基础](docs/superpowers/plans/02-provider-and-runtime.md)
+- [P03 数据采集与决策快照](docs/superpowers/plans/03-data-and-snapshots.md)
+- [P04 Jev 决策与交易意图](docs/superpowers/plans/04-jev-decision-and-intent.md)
+- [P05 交易执行与账本](docs/superpowers/plans/05-execution-and-ledger.md)
+- [P06 管理后台](docs/superpowers/plans/06-admin-application.md)
+- [P07 全流程集成与故障验收](docs/superpowers/plans/07-integration-and-failure-tests.md)
+- [P08 部署与外部验收](docs/superpowers/plans/08-deployment-and-external-acceptance.md)
 
-## 本次修订
+## 本次拆分
 
-补充提示词/报价/提交一致性、禁止改写模型动作、持仓与在途故障回归、按资产检索历史、持久化生命周期时间线、阶段耗时和运行成本口径。原T01—T22编号保留，各任务的R2扩展指向专项清单；SSE明确后续增强，不阻塞第一版。GMGN官方API与Plus预算、金额档位和Jev最终权限不变。
+原22项主任务保留覆盖；Worker的运行骨架前移，形成23个阶段内任务。U01—U06已内联到对应阶段，旧执行文件仅保留导航和Git历史链接。SSE仍后续增强，未增加规则策略、对照组或依赖服务。
 
-## 已固定的产品要求
+[阶段状态](docs/superpowers/plans/execution-status.json)初始全部NOT_STARTED；[覆盖映射](docs/superpowers/plans/coverage-map.json)连接R01—R12、旧T01—T22和U01—U06，映射不代表代码已经通过测试。
 
-Robinhood、BSC、Solana；各链预存资金、不跨链调拨；GMGN 官方 API 按 Plus 套餐设计；Jev 全局选择单个最终动作；买入本金为 10／20／50／100 美元等值档位，卖出当前可用持仓的 25%／50%／75%／100%；配置存数据库并版本化；实盘提交只由服务端环境变量授权；独立项目且第一版含完整管理页面和真实交易闭环。
+## 固定需求
 
-程序整理行情、账户、安全及钱包参与事实（包含 KOL、被追踪数、被备注数），不添加技术指标买卖门槛、置信度门槛、固定止盈止损或对照组。
+Robinhood/BSC/Solana；各链预存资金不自动桥接；GMGN官方Plus；Jev全局最多一笔最终交易。买入10/20/50/100 USD本金参考值，卖出当前可用持仓25/50/75/100%；数据库配置版本化，TRADING_ENABLED服务端环境变量默认false且页面不能绕过。独立项目、管理页面、真实成交/账本/恢复闭环均为V0.1交付范围。
 
-## 实施边界
+程序提供行情、安全、KOL参与、钱包被追踪/被备注等事实与历史，不设置选币/置信度门槛或固定止盈止损。
 
-本包只提供文档，存放于用户指定的`common-share/jev-gmgn-trader-plan`目录。未创建产品代码、安装产品依赖、生成真实凭证、调用私有交易账户或发起交易。计划文件可复制到新的产品仓库，不在这个资料仓库自动开始实施。
+## 设计与来源（按需查阅）
 
-工程默认值不等于已被用户逐项确认的产品偏好。文档使用明确默认值继续推进设计；部署用的钱包、私钥、资金和滑点配置必须由项目所有者提供，不能使用样例值自动开启交易。
+- [需求与技术设计](docs/superpowers/specs/2026-09-21-jev-gmgn-trader-design.md)：包含R3阶段职责，第1—15节业务和工程不变量继续有效。
+- [API核验记录](docs/references/2026-09-21-api-evidence.md)：既有公开契约和待账号核实项；本次未重新执行供应商请求。
+- [参考项目评审](docs/references/2026-09-21-reference-project-review.md)：固定源码版本与采用边界，不是Agent每阶段必读的另一份计划。
 
-## 给 Codex／实施代理的交接说明
+## 实施与验证边界
 
-在用户确认计划并明确要求实施后，按实施计划的 T01→T22 顺序工作。先读取设计、主实施计划、必做专项实施清单与两份证据记录，不从当前聊天片段猜需求。T01 固定上游契约；依赖按当时已验证兼容的安全补丁锁定。没有真实凭证时，完成合成 fixture、模拟传输和 UI 的本地测试，将账号只读验收及实盘验收明确标为未执行，不编造通过记录。
+common-share/jev-gmgn-trader-plan仅存资料。只有用户明确要求产品实施并指定独立目标后，才进入P01；本次拆分不创建产品代码、不安装依赖、不提交真实交易。
 
-默认 `TRADING_ENABLED=false`，任何 CI、自动测试、文档示例均不得向真实 GMGN Swap 提交。不能为了“完整交易”替用户启用实盘，不能向用户索取聊天中的私钥。新增交易只能从持久化的 Jev 决策意图进入唯一执行器。
+每阶段结束按执行规则写产品仓库`docs/execution/Pxx-handoff.md`，状态/实际测试/接口/commit均可复查。缺凭证可完成本地模拟传输测试，账号只读和逐链实盘验证单独标NOT_RUN，不能虚构通过。
 
-计划采用独立 Web + Worker + PostgreSQL，不默认追加 Redis、微服务、回测平台或其他 LLM。需要改变已固定的产品规则时先记录变更并让用户审阅，不借性能优化悄悄增加选币过滤。
-
-## 文档校验
-
-`document-validation.json`仅记录本次文档检查；不代表产品测试。`SHA256SUMS.txt`覆盖除自身之外的全部计划文件，包含校验记录。产品验收仍按T20—T22独立执行。
+`document-validation.json`仅为本次文档检查，`SHA256SUMS.txt`覆盖除自身外全部文件。校验脚本见[scripts/validate-plan.py](scripts/validate-plan.py)，不运行产品代码或外部网络。

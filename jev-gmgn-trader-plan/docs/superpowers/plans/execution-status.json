@@ -1,0 +1,119 @@
+{
+  "revision": "R3",
+  "updatedAt": "2026-09-21",
+  "scope": "DOCUMENT_REORGANIZATION_ONLY",
+  "productImplementationAuthorized": false,
+  "phases": [
+    {
+      "id": "P01",
+      "plan": "01-foundation-and-config.md",
+      "dependencies": [],
+      "status": "NOT_STARTED",
+      "implementationCommit": null,
+      "verificationEvidence": [],
+      "handoffPath": "docs/execution/P01-handoff.md",
+      "blockedReason": null
+    },
+    {
+      "id": "P02",
+      "plan": "02-provider-and-runtime.md",
+      "dependencies": [
+        "P01"
+      ],
+      "status": "NOT_STARTED",
+      "implementationCommit": null,
+      "verificationEvidence": [],
+      "handoffPath": "docs/execution/P02-handoff.md",
+      "blockedReason": null
+    },
+    {
+      "id": "P03",
+      "plan": "03-data-and-snapshots.md",
+      "dependencies": [
+        "P02"
+      ],
+      "status": "NOT_STARTED",
+      "implementationCommit": null,
+      "verificationEvidence": [],
+      "handoffPath": "docs/execution/P03-handoff.md",
+      "blockedReason": null
+    },
+    {
+      "id": "P04",
+      "plan": "04-jev-decision-and-intent.md",
+      "dependencies": [
+        "P03"
+      ],
+      "status": "NOT_STARTED",
+      "implementationCommit": null,
+      "verificationEvidence": [],
+      "handoffPath": "docs/execution/P04-handoff.md",
+      "blockedReason": null
+    },
+    {
+      "id": "P05",
+      "plan": "05-execution-and-ledger.md",
+      "dependencies": [
+        "P04"
+      ],
+      "status": "NOT_STARTED",
+      "implementationCommit": null,
+      "verificationEvidence": [],
+      "handoffPath": "docs/execution/P05-handoff.md",
+      "blockedReason": null
+    },
+    {
+      "id": "P06",
+      "plan": "06-admin-application.md",
+      "dependencies": [
+        "P05"
+      ],
+      "status": "NOT_STARTED",
+      "implementationCommit": null,
+      "verificationEvidence": [],
+      "handoffPath": "docs/execution/P06-handoff.md",
+      "blockedReason": null
+    },
+    {
+      "id": "P07",
+      "plan": "07-integration-and-failure-tests.md",
+      "dependencies": [
+        "P06"
+      ],
+      "status": "NOT_STARTED",
+      "implementationCommit": null,
+      "verificationEvidence": [],
+      "handoffPath": "docs/execution/P07-handoff.md",
+      "blockedReason": null
+    },
+    {
+      "id": "P08",
+      "plan": "08-deployment-and-external-acceptance.md",
+      "dependencies": [
+        "P07"
+      ],
+      "status": "NOT_STARTED",
+      "implementationCommit": null,
+      "verificationEvidence": [],
+      "handoffPath": "docs/execution/P08-handoff.md",
+      "blockedReason": null
+    }
+  ],
+  "externalValidation": {
+    "robinhood": {
+      "providerReadOnly": "NOT_RUN",
+      "liveAcceptance": "NOT_RUN"
+    },
+    "bsc": {
+      "providerReadOnly": "NOT_RUN",
+      "liveAcceptance": "NOT_RUN"
+    },
+    "sol": {
+      "providerReadOnly": "NOT_RUN",
+      "liveAcceptance": "NOT_RUN"
+    }
+  },
+  "deferred": [
+    "D01"
+  ]
+}
